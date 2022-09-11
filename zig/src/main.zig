@@ -11,7 +11,7 @@ const usage =
     \\    -v           print version
 ;
 
-const version = "0.1";
+const version = @embedFile("version.txt");
 
 pub fn main() !void {
     if (builtin.os.tag != .linux) {
@@ -28,9 +28,6 @@ pub fn main() !void {
     defer arena_instance.deinit();
     const arena = arena_instance.allocator();
 
-    var bw = std.io.bufferedWriter(std.io.getStdOut().writer());
-    const w = bw.writer();
-
     const args = try std.process.argsAlloc(arena);
 
     if (args.len == 1) {
@@ -44,8 +41,8 @@ pub fn main() !void {
             std.process.exit(1);
         }
         if (std.mem.eql(u8, args[1], "-v")) {
-            try std.fmt.format(w, "{s}\n", .{version});
-            return;
+            try std.io.getStdOut().writer().print("{s}\n", .{version});
+            std.process.exit(0);
         }
     }
 
@@ -62,6 +59,9 @@ pub fn main() !void {
     if (second.len % 2 != 0) {
         fatal("'{s}' has invalid length", .{second});
     }
+
+    var bw = std.io.bufferedWriter(std.io.getStdOut().writer());
+    const w = bw.writer();
 
     try processHex(w, first, second);
     try processHex(w, second, first);
