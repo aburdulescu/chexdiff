@@ -1,8 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const stdout = std.io.getStdOut().writer();
-
 const usage =
     \\Usage: chexdiff [options] hex1 hex2
     \\
@@ -30,6 +28,9 @@ pub fn main() !void {
     defer arena_instance.deinit();
     const arena = arena_instance.allocator();
 
+    var bw = std.io.bufferedWriter(std.io.getStdOut().writer());
+    const w = bw.writer();
+
     const args = try std.process.argsAlloc(arena);
 
     if (args.len == 1) {
@@ -43,7 +44,7 @@ pub fn main() !void {
             std.process.exit(1);
         }
         if (std.mem.eql(u8, args[1], "-v")) {
-            try stdout.print("{s}\n", .{version});
+            try std.fmt.format(w, "{s}\n", .{version});
             return;
         }
     }
@@ -62,8 +63,10 @@ pub fn main() !void {
         fatal("'{s}' has invalid length", .{second});
     }
 
-    try hexstr_process(first, second);
-    try hexstr_process(second, first);
+    try processHex(w, first, second);
+    try processHex(w, second, first);
+
+    try bw.flush();
 }
 
 pub fn fatal(comptime format: []const u8, args: anytype) noreturn {
@@ -112,18 +115,66 @@ test "isHexDigitEq" {
     try std.testing.expect(!isHexDigitEq("AA", "bb"));
 }
 
-fn hexstr_process(self: []const u8, other: []const u8) !void {
+fn processHex(w: anytype, self: []const u8, other: []const u8) !void {
     const cmn_len = if (self.len < other.len) self.len else other.len;
     var i: usize = 0;
     while (i < cmn_len) : (i += 2) {
         if (isHexDigitEq(self[i .. i + 2], other[i .. i + 2])) {
-            try stdout.print("{s}", .{self[i .. i + 2]});
+            try std.fmt.format(w, "{s}", .{self[i .. i + 2]});
         } else {
-            try stdout.print("{s}{s}{s}", .{ RED, self[i .. i + 2], RESET });
+            try std.fmt.format(w, "{s}{s}{s}", .{ RED, self[i .. i + 2], RESET });
         }
     }
     if (self.len > other.len) {
-        try stdout.print("{s}{s}{s}", .{ RED, self[other.len..], RESET });
+        try std.fmt.format(w, "{s}{s}{s}", .{ RED, self[other.len..], RESET });
     }
-    try stdout.print("\n", .{});
+    try std.fmt.format(w, "\n", .{});
+}
+
+test "processHexStringsEqual" {
+    const expected = "ffff0102";
+
+    var buf: [1024]u8 = undefined;
+    var fbs = std.io.fixedBufferStream(&buf);
+    const w = fbs.writer();
+
+    try processHex(w, expected, expected);
+
+    const result = buf[0 .. fbs.pos - 1];
+
+    try std.testing.expectEqualSlices(u8, result, expected);
+}
+
+test "processHexStringsNotEqual" {
+    const l = "ffff";
+    const r = "fff0";
+
+    const expected = "ff" ++ RED ++ "ff" ++ RESET;
+
+    var buf: [1024]u8 = undefined;
+    var fbs = std.io.fixedBufferStream(&buf);
+    const w = fbs.writer();
+
+    try processHex(w, l, r);
+
+    const result = buf[0 .. fbs.pos - 1];
+
+    try std.testing.expectEqualSlices(u8, result, expected);
+}
+
+test "processHexMixedCase" {
+    const l = "FFaa";
+    const r = "ffAA";
+
+    const expected = l;
+
+    var buf: [1024]u8 = undefined;
+    var fbs = std.io.fixedBufferStream(&buf);
+    const w = fbs.writer();
+
+    try processHex(w, l, r);
+
+    const result = buf[0 .. fbs.pos - 1];
+
+    try std.testing.expectEqualSlices(u8, result, expected);
 }
