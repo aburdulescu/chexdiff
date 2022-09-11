@@ -1,19 +1,19 @@
 const std = @import("std");
 
 pub fn build(b: *std.build.Builder) void {
-    b.setPreferredReleaseMode(.ReleaseFast);
+    b.setPreferredReleaseMode(.ReleaseSmall);
 
     const target = b.standardTargetOptions(.{});
     const mode = b.standardReleaseOptions();
 
-    const no_single_threaded = b.option(bool, "no-single-threaded", "Don't build artifacts that run in single threaded mode") orelse false;
-    const no_strip = b.option(bool, "no-strip", "Don't omit debug information") orelse false;
+    const single_threaded = b.option(bool, "single-threaded", "Build artifacts that run in single threaded mode") orelse true;
+    const strip = b.option(bool, "strip", "Omit debug information") orelse true;
 
     const exe = b.addExecutable("chexdiff", "src/main.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
-    exe.strip = !no_strip;
-    exe.single_threaded = !no_single_threaded;
+    exe.strip = strip;
+    exe.single_threaded = single_threaded;
     exe.install();
 
     const run_cmd = exe.run();
@@ -24,13 +24,4 @@ pub fn build(b: *std.build.Builder) void {
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
-
-    const exe_tests = b.addTest("src/main.zig");
-    exe_tests.setTarget(target);
-    exe_tests.setBuildMode(mode);
-    exe_tests.strip = !no_strip;
-    exe_tests.single_threaded = !no_single_threaded;
-
-    const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&exe_tests.step);
 }
