@@ -18,17 +18,7 @@ pub fn main() !void {
         @compileError("requested OS is not supported!");
     }
 
-    var gpa_instance = std.heap.GeneralPurposeAllocator(.{}){};
-    defer {
-        _ = gpa_instance.deinit();
-    }
-    const gpa = gpa_instance.allocator();
-
-    var arena_instance = std.heap.ArenaAllocator.init(gpa);
-    defer arena_instance.deinit();
-    const arena = arena_instance.allocator();
-
-    const args = try std.process.argsAlloc(arena);
+    const args = try std.process.argsAlloc(std.heap.c_allocator);
 
     if (args.len == 1) {
         std.debug.print("{s}\n", .{usage});
