@@ -53,8 +53,7 @@ pub fn main() !void {
     var bw = std.io.bufferedWriter(std.io.getStdOut().writer());
     const w = bw.writer();
 
-    try processHex(w, first, second);
-    try processHex(w, second, first);
+    try processStrings(w, first, second);
 
     try bw.flush();
 }
@@ -105,66 +104,114 @@ test "isHexDigitEq" {
     try std.testing.expect(!isHexDigitEq("AA", "bb"));
 }
 
-fn processHex(w: anytype, self: []const u8, other: []const u8) !void {
-    const cmn_len = if (self.len < other.len) self.len else other.len;
+fn processStrings(w: anytype, first: []const u8, second: []const u8) !void {
+    const min_len = std.math.min(first.len, second.len);
     var i: usize = 0;
-    while (i < cmn_len) : (i += 2) {
-        if (isHexDigitEq(self[i .. i + 2], other[i .. i + 2])) {
-            try std.fmt.format(w, "{s}", .{self[i .. i + 2]});
+    while (i < min_len) : (i += 2) {
+        const l = first[i .. i + 2];
+        const r = second[i .. i + 2];
+        if (isHexDigitEq(l, r)) {
+            try std.fmt.format(w, "{s} {s}\n", .{ l, r });
         } else {
-            try std.fmt.format(w, "{s}{s}{s}", .{ RED, self[i .. i + 2], RESET });
+            try std.fmt.format(w, "{s}{s} {s}{s}\n", .{ RED, l, r, RESET });
         }
     }
-    if (self.len > other.len) {
-        try std.fmt.format(w, "{s}{s}{s}", .{ RED, self[other.len..], RESET });
+    if (first.len == second.len) return;
+    var extra: []const u8 = undefined;
+    var padding: []const u8 = undefined;
+    if (first.len > second.len) {
+        extra = first[i..];
+        padding = "";
+    } else {
+        extra = second[i..];
+        padding = "   ";
     }
-    try std.fmt.format(w, "\n", .{});
+    var j: usize = 0;
+    while (j < extra.len) : (j += 2) {
+        try std.fmt.format(w, "{s}{s}{s}{s}\n", .{ RED, padding, extra[j .. j + 2], RESET });
+    }
 }
 
-test "processHexStringsEqual" {
-    const expected = "ffff0102";
+test "processStringsEqual" {
+    const input = "ffff0102";
+
+    const expected = "ff ff\nff ff\n01 01\n02 02";
 
     var buf: [1024]u8 = undefined;
     var fbs = std.io.fixedBufferStream(&buf);
     const w = fbs.writer();
 
-    try processHex(w, expected, expected);
+    try processStrings(w, input, input);
 
     const result = buf[0 .. fbs.pos - 1];
 
-    try std.testing.expectEqualSlices(u8, result, expected);
+    try std.testing.expectEqualSlices(u8, expected, result);
 }
 
-test "processHexStringsNotEqual" {
+test "processStringsNotEqual" {
     const l = "ffff";
     const r = "fff0";
 
-    const expected = "ff" ++ RED ++ "ff" ++ RESET;
+    const expected = "ff ff\n" ++ RED ++ "ff f0" ++ RESET;
 
     var buf: [1024]u8 = undefined;
     var fbs = std.io.fixedBufferStream(&buf);
     const w = fbs.writer();
 
-    try processHex(w, l, r);
+    try processStrings(w, l, r);
 
     const result = buf[0 .. fbs.pos - 1];
 
-    try std.testing.expectEqualSlices(u8, result, expected);
+    try std.testing.expectEqualSlices(u8, expected, result);
 }
 
-test "processHexMixedCase" {
+test "processMixedCase" {
     const l = "FFaa";
     const r = "ffAA";
 
-    const expected = l;
+    const expected = "FF ff\naa AA";
 
     var buf: [1024]u8 = undefined;
     var fbs = std.io.fixedBufferStream(&buf);
     const w = fbs.writer();
 
-    try processHex(w, l, r);
+    try processStrings(w, l, r);
 
     const result = buf[0 .. fbs.pos - 1];
 
-    try std.testing.expectEqualSlices(u8, result, expected);
+    try std.testing.expectEqualSlices(u8, expected, result);
+}
+
+test "processStringsFirstIsBigger" {
+    const l = "ffff00";
+    const r = "ffff";
+
+    const expected = "ff ff\nff ff\n" ++ RED ++ "00" ++ RESET;
+
+    var buf: [1024]u8 = undefined;
+    var fbs = std.io.fixedBufferStream(&buf);
+    const w = fbs.writer();
+
+    try processStrings(w, l, r);
+
+    const result = buf[0 .. fbs.pos - 1];
+
+    try std.testing.expectEqualSlices(u8, expected, result);
+}
+
+test "processStringsSecondIsBigger" {
+    const l = "ffff";
+    const r = "ffff00";
+
+    const expected = "ff ff\nff ff\n" ++ RED ++ "   00" ++ RESET;
+
+    var buf: [1024]u8 = undefined;
+    var fbs = std.io.fixedBufferStream(&buf);
+    const w = fbs.writer();
+
+    try processStrings(w, l, r);
+
+    const result = buf[0 .. fbs.pos - 1];
+
+    try std.testing.expectEqualSlices(u8, expected, result);
 }
