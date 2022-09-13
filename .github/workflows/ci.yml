@@ -8,4 +8,5 @@ jobs:
       - uses: goto-bus-stop/setup-zig@v1
         with:
           version: master
-      - run: zig build test -Drelease=true -Dtarget=x86_64-linux-musl
+      - run: zig build -Drelease=true -Dtarget=x86_64-linux-musl
+      - run: zig build test
