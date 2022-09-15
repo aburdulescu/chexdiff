@@ -9,6 +9,7 @@ const usage =
     \\Options:
     \\    -h/--help    print this message
     \\    -v           print version
+    \\    -i           ignore case
 ;
 
 const version = @embedFile("version.txt");
@@ -36,24 +37,37 @@ pub fn main() !void {
         }
     }
 
-    if (args.len != 3) {
+    var flag_ignore_case = false;
+
+    var i: usize = 1;
+    var n: usize = args.len;
+
+    if (std.mem.eql(u8, args[i], "-i")) {
+        flag_ignore_case = true;
+        i += 1;
+        n -= 1;
+    }
+
+    if (n != 3) {
         fatal("wrong number of args, need two: 1st and 2nd hex string", .{});
     }
 
-    const first = args[1];
+    const first = args[i];
     if (first.len % 2 != 0) {
         fatal("'{s}' has invalid length", .{first});
     }
+    i += 1;
 
-    const second = args[2];
+    const second = args[i];
     if (second.len % 2 != 0) {
         fatal("'{s}' has invalid length", .{second});
     }
+    i += 1;
 
     var bw = std.io.bufferedWriter(std.io.getStdOut().writer());
     const w = bw.writer();
 
-    try processStrings(w, first, second);
+    try processStrings(w, first, second, flag_ignore_case);
 
     try bw.flush();
 }
@@ -81,36 +95,57 @@ test "isUpper" {
     }
 }
 
-fn isCharEq(l: u8, r: u8) bool {
+fn isCharEqual(l: u8, r: u8) bool {
+    return l == r;
+}
+
+fn isCharEqualIgnCase(l: u8, r: u8) bool {
     const magic = 'a' - 'A';
     const ll = if (isUpper(l)) l + magic else l;
     const rr = if (isUpper(r)) r + magic else r;
     return ll == rr;
 }
 
-test "isCharEq" {
-    try std.testing.expect(isCharEq('A', 'a'));
-    try std.testing.expect(!isCharEq('A', 'b'));
+test "isCharEqual" {
+    try std.testing.expect(!isCharEqual('A', 'a'));
+    try std.testing.expect(!isCharEqual('A', 'b'));
+    try std.testing.expect(isCharEqual('a', 'a'));
+    try std.testing.expect(isCharEqual('A', 'A'));
 }
 
-fn isHexDigitEq(l: []const u8, r: []const u8) bool {
-    return isCharEq(l[0], r[0]) and isCharEq(l[1], r[1]);
+test "isCharEqualIgnCase" {
+    try std.testing.expect(isCharEqualIgnCase('A', 'a'));
+    try std.testing.expect(!isCharEqualIgnCase('A', 'b'));
+    try std.testing.expect(isCharEqualIgnCase('A', 'A'));
+    try std.testing.expect(!isCharEqualIgnCase('A', 'B'));
+}
+
+fn isHexDigitEqual(l: []const u8, r: []const u8, ignore_case: bool) bool {
+    if (ignore_case) {
+        return isCharEqualIgnCase(l[0], r[0]) and isCharEqualIgnCase(l[1], r[1]);
+    } else {
+        return isCharEqual(l[0], r[0]) and isCharEqual(l[1], r[1]);
+    }
 }
 
 test "isHexDigitEq" {
-    try std.testing.expect(isHexDigitEq("AA", "AA"));
-    try std.testing.expect(isHexDigitEq("AA", "aa"));
-    try std.testing.expect(!isHexDigitEq("AA", "BB"));
-    try std.testing.expect(!isHexDigitEq("AA", "bb"));
+    try std.testing.expect(isHexDigitEqual("AA", "AA", false));
+    try std.testing.expect(!isHexDigitEqual("AA", "aa", false));
+    try std.testing.expect(!isHexDigitEqual("AA", "BB", false));
+    try std.testing.expect(!isHexDigitEqual("AA", "bb", false));
+    try std.testing.expect(isHexDigitEqual("AA", "AA", true));
+    try std.testing.expect(isHexDigitEqual("AA", "aa", true));
+    try std.testing.expect(!isHexDigitEqual("AA", "BB", true));
+    try std.testing.expect(!isHexDigitEqual("AA", "bb", true));
 }
 
-fn processStrings(w: anytype, first: []const u8, second: []const u8) !void {
+fn processStrings(w: anytype, first: []const u8, second: []const u8, ignore_case: bool) !void {
     const min_len = std.math.min(first.len, second.len);
     var i: usize = 0;
     while (i < min_len) : (i += 2) {
         const l = first[i .. i + 2];
         const r = second[i .. i + 2];
-        if (isHexDigitEq(l, r)) {
+        if (isHexDigitEqual(l, r, ignore_case)) {
             try std.fmt.format(w, "{s} {s}\n", .{ l, r });
         } else {
             try std.fmt.format(w, "{s}{s} {s}{s}\n", .{ RED, l, r, RESET });
@@ -141,7 +176,7 @@ test "processStringsEqual" {
     var fbs = std.io.fixedBufferStream(&buf);
     const w = fbs.writer();
 
-    try processStrings(w, input, input);
+    try processStrings(w, input, input, true);
 
     const result = buf[0 .. fbs.pos - 1];
 
@@ -158,7 +193,7 @@ test "processStringsNotEqual" {
     var fbs = std.io.fixedBufferStream(&buf);
     const w = fbs.writer();
 
-    try processStrings(w, l, r);
+    try processStrings(w, l, r, false);
 
     const result = buf[0 .. fbs.pos - 1];
 
@@ -175,7 +210,7 @@ test "processMixedCase" {
     var fbs = std.io.fixedBufferStream(&buf);
     const w = fbs.writer();
 
-    try processStrings(w, l, r);
+    try processStrings(w, l, r, true);
 
     const result = buf[0 .. fbs.pos - 1];
 
@@ -192,7 +227,7 @@ test "processStringsFirstIsBigger" {
     var fbs = std.io.fixedBufferStream(&buf);
     const w = fbs.writer();
 
-    try processStrings(w, l, r);
+    try processStrings(w, l, r, false);
 
     const result = buf[0 .. fbs.pos - 1];
 
@@ -209,7 +244,7 @@ test "processStringsSecondIsBigger" {
     var fbs = std.io.fixedBufferStream(&buf);
     const w = fbs.writer();
 
-    try processStrings(w, l, r);
+    try processStrings(w, l, r, true);
 
     const result = buf[0 .. fbs.pos - 1];
 
