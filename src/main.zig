@@ -7,8 +7,8 @@ const usage =
     \\Compare the two hex strings and print their differences.
     \\
     \\Options:
-    \\    -h/--help    print this message
-    \\    -v           print version
+    \\    -h/--help    print this message and exit
+    \\    -v           print version and exit
     \\    -i           ignore case
 ;
 
