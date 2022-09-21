@@ -37,6 +37,9 @@ pub fn main() !void {
         }
     }
 
+    // TODO: add -f flag which interprets inputs as files
+    // TODO: print diff when inputs differ and return 1, print nothing when they are equal and return 0
+
     var flag_ignore_case = false;
 
     var i: usize = 1;
