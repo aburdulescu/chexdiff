@@ -4,7 +4,7 @@ const builtin = @import("builtin");
 const usage =
     \\Usage: chexdiff [options] hex1 hex2
     \\
-    \\Compare the two hex strings and print their differences.
+    \\Compare the two hex strings and print their differences, if any.
     \\
     \\Options:
     \\    -h/--help    print this message and exit
@@ -38,7 +38,6 @@ pub fn main() !void {
     }
 
     // TODO: add -f flag which interprets inputs as files
-    // TODO: print diff when inputs differ and return 1, print nothing when they are equal and return 0
 
     var flag_ignore_case = false;
 
@@ -70,9 +69,12 @@ pub fn main() !void {
     var bw = std.io.bufferedWriter(std.io.getStdOut().writer());
     const w = bw.writer();
 
-    try processStrings(w, first, second, flag_ignore_case);
+    const result = try processStrings(w, first, second, flag_ignore_case);
 
-    try bw.flush();
+    if (!result) {
+        try bw.flush();
+        std.process.exit(1);
+    }
 }
 
 pub fn fatal(comptime format: []const u8, args: anytype) noreturn {
@@ -142,8 +144,9 @@ test "isHexDigitEq" {
     try std.testing.expect(!isHexDigitEqual("AA", "bb", true));
 }
 
-fn processStrings(w: anytype, first: []const u8, second: []const u8, ignore_case: bool) !void {
+fn processStrings(w: anytype, first: []const u8, second: []const u8, ignore_case: bool) !bool {
     const min_len = std.math.min(first.len, second.len);
+    var result = true;
     var i: usize = 0;
     while (i < min_len) : (i += 2) {
         const l = first[i .. i + 2];
@@ -152,9 +155,11 @@ fn processStrings(w: anytype, first: []const u8, second: []const u8, ignore_case
             try std.fmt.format(w, "{s} {s}\n", .{ l, r });
         } else {
             try std.fmt.format(w, "{s}{s} {s}{s}\n", .{ RED, l, r, RESET });
+            result = false;
         }
     }
-    if (first.len == second.len) return;
+    if (first.len == second.len) return result;
+    result = false;
     var extra: []const u8 = undefined;
     var padding: []const u8 = undefined;
     if (first.len > second.len) {
@@ -168,6 +173,7 @@ fn processStrings(w: anytype, first: []const u8, second: []const u8, ignore_case
     while (j < extra.len) : (j += 2) {
         try std.fmt.format(w, "{s}{s}{s}{s}\n", .{ RED, padding, extra[j .. j + 2], RESET });
     }
+    return result;
 }
 
 test "processStringsEqual" {
@@ -179,7 +185,7 @@ test "processStringsEqual" {
     var fbs = std.io.fixedBufferStream(&buf);
     const w = fbs.writer();
 
-    try processStrings(w, input, input, true);
+    try std.testing.expect(try processStrings(w, input, input, true));
 
     const result = buf[0 .. fbs.pos - 1];
 
@@ -196,7 +202,7 @@ test "processStringsNotEqual" {
     var fbs = std.io.fixedBufferStream(&buf);
     const w = fbs.writer();
 
-    try processStrings(w, l, r, false);
+    try std.testing.expect(!try processStrings(w, l, r, false));
 
     const result = buf[0 .. fbs.pos - 1];
 
@@ -213,7 +219,7 @@ test "processMixedCase" {
     var fbs = std.io.fixedBufferStream(&buf);
     const w = fbs.writer();
 
-    try processStrings(w, l, r, true);
+    try std.testing.expect(try processStrings(w, l, r, true));
 
     const result = buf[0 .. fbs.pos - 1];
 
@@ -230,7 +236,7 @@ test "processStringsFirstIsBigger" {
     var fbs = std.io.fixedBufferStream(&buf);
     const w = fbs.writer();
 
-    try processStrings(w, l, r, false);
+    try std.testing.expect(!try processStrings(w, l, r, false));
 
     const result = buf[0 .. fbs.pos - 1];
 
@@ -247,7 +253,7 @@ test "processStringsSecondIsBigger" {
     var fbs = std.io.fixedBufferStream(&buf);
     const w = fbs.writer();
 
-    try processStrings(w, l, r, true);
+    try std.testing.expect(!try processStrings(w, l, r, true));
 
     const result = buf[0 .. fbs.pos - 1];
 
