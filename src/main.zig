@@ -2,14 +2,15 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const usage =
-    \\Usage: chexdiff [options] hex1 hex2
+    \\Usage: chexdiff [options] input1 input2
     \\
-    \\Compare the two hex strings and print their differences, if any.
+    \\Compare the two given hex strings(or those from the given files) and print their differences, if any.
     \\
     \\Options:
     \\    -h/--help    print this message and exit
     \\    -v           print version and exit
-    \\    -i           ignore case
+    \\    -i           case insensitive comparison, i.e. AA==aa
+    \\    -f           treat inputs as files, i.e. open those files and compare their contents
 ;
 
 const version = @embedFile("version.txt");
@@ -37,9 +38,8 @@ pub fn main() !void {
         }
     }
 
-    // TODO: add -f flag which interprets inputs as files
-
     var flag_ignore_case = false;
+    var flag_as_files = false;
 
     var i: usize = 1;
     var n: usize = args.len;
@@ -50,17 +50,39 @@ pub fn main() !void {
         n -= 1;
     }
 
-    if (n != 3) {
-        fatal("wrong number of args, need two: 1st and 2nd hex string", .{});
+    if (std.mem.eql(u8, args[i], "-f")) {
+        flag_as_files = true;
+        i += 1;
+        n -= 1;
     }
 
-    const first = args[i];
+    if (n != 3) {
+        fatal("wrong number of args, need two: 1st and 2nd hex string/file", .{});
+    }
+
+    var first: []const u8 = undefined;
+    if (flag_as_files) {
+        first = readFile(std.heap.c_allocator, args[i]) catch |err| {
+            fatal("could read file '{s}': {}", .{ args[i], err });
+        };
+        if (first[first.len - 1] == '\n') first = first[0 .. first.len - 1];
+    } else {
+        first = args[i];
+    }
     if (first.len % 2 != 0) {
         fatal("'{s}' has invalid length", .{first});
     }
     i += 1;
 
-    const second = args[i];
+    var second: []const u8 = undefined;
+    if (flag_as_files) {
+        second = readFile(std.heap.c_allocator, args[i]) catch |err| {
+            fatal("could read file '{s}': {}", .{ args[i], err });
+        };
+        if (second[second.len - 1] == '\n') second = second[0 .. second.len - 1];
+    } else {
+        second = args[i];
+    }
     if (second.len % 2 != 0) {
         fatal("'{s}' has invalid length", .{second});
     }
@@ -75,6 +97,14 @@ pub fn main() !void {
         try bw.flush();
         std.process.exit(1);
     }
+}
+
+fn readFile(all: std.mem.Allocator, path: []const u8) ![]const u8 {
+    const f = try std.fs.cwd().openFile(path, std.fs.File.OpenFlags{});
+    defer f.close();
+    const st = try f.stat();
+    const content = try f.reader().readAllAlloc(all, st.size);
+    return content;
 }
 
 pub fn fatal(comptime format: []const u8, args: anytype) noreturn {
