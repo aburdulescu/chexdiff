@@ -4,13 +4,14 @@ const builtin = @import("builtin");
 const usage =
     \\Usage: chexdiff [options] input1 input2
     \\
-    \\Compare the two given hex strings(or those from the given files) and print their differences, if any.
+    \\Compare the two given inputs as hex and print their differences, if any.
     \\
     \\Options:
-    \\    -h/--help    print this message and exit
-    \\    -v           print version and exit
-    \\    -i           case insensitive comparison, i.e. AA==aa
-    \\    -f           treat inputs as files, i.e. open those files and compare their contents
+    \\    -h    print this message and exit
+    \\    -v    print version and exit
+    \\    -i    case insensitive comparison
+    \\    -f    treat inputs as files and compare their contents
+    \\    -x    if -f is active, convert file contents to hex before comparing them
 ;
 
 const version = @embedFile("version.txt");
@@ -28,7 +29,7 @@ pub fn main() !void {
     }
 
     if (args.len >= 2) {
-        if (std.mem.eql(u8, args[1], "-h") or std.mem.eql(u8, args[1], "--help")) {
+        if (std.mem.eql(u8, args[1], "-h")) {
             std.debug.print("{s}\n", .{usage});
             std.process.exit(1);
         }
@@ -40,6 +41,7 @@ pub fn main() !void {
 
     var flag_ignore_case = false;
     var flag_as_files = false;
+    var flag_convert_to_hex = false;
 
     var i: usize = 1;
     var n: usize = args.len;
@@ -49,9 +51,13 @@ pub fn main() !void {
         i += 1;
         n -= 1;
     }
-
     if (std.mem.eql(u8, args[i], "-f")) {
         flag_as_files = true;
+        i += 1;
+        n -= 1;
+    }
+    if (std.mem.eql(u8, args[i], "-x")) {
+        flag_convert_to_hex = true;
         i += 1;
         n -= 1;
     }
@@ -62,10 +68,16 @@ pub fn main() !void {
 
     var first: []const u8 = undefined;
     if (flag_as_files) {
-        first = readFile(std.heap.c_allocator, args[i]) catch |err| {
-            fatal("could read file '{s}': {}", .{ args[i], err });
+        const data = readFile(std.heap.c_allocator, args[i]) catch |err| {
+            fatal("could not read file '{s}': {}", .{ args[i], err });
         };
-        if (first[first.len - 1] == '\n') first = first[0 .. first.len - 1];
+        if (!flag_convert_to_hex) {
+            first = data;
+            if (first[first.len - 1] == '\n') first = first[0 .. first.len - 1];
+        } else {
+            var buf = try std.heap.c_allocator.alloc(u8, data.len * 2);
+            first = try std.fmt.bufPrint(buf, "{}", .{std.fmt.fmtSliceHexLower(data)});
+        }
     } else {
         first = args[i];
     }
@@ -76,10 +88,16 @@ pub fn main() !void {
 
     var second: []const u8 = undefined;
     if (flag_as_files) {
-        second = readFile(std.heap.c_allocator, args[i]) catch |err| {
-            fatal("could read file '{s}': {}", .{ args[i], err });
+        const data = readFile(std.heap.c_allocator, args[i]) catch |err| {
+            fatal("could not read file '{s}': {}", .{ args[i], err });
         };
-        if (second[second.len - 1] == '\n') second = second[0 .. second.len - 1];
+        if (!flag_convert_to_hex) {
+            second = data;
+            if (second[second.len - 1] == '\n') second = second[0 .. second.len - 1];
+        } else {
+            var buf = try std.heap.c_allocator.alloc(u8, data.len * 2);
+            second = try std.fmt.bufPrint(buf, "{}", .{std.fmt.fmtSliceHexLower(data)});
+        }
     } else {
         second = args[i];
     }
