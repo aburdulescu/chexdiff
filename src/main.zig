@@ -46,18 +46,16 @@ pub fn main() !void {
     var i: usize = 1;
     var n: usize = args.len;
 
-    if (std.mem.eql(u8, args[i], "-i")) {
-        flag_ignore_case = true;
-        i += 1;
-        n -= 1;
-    }
-    if (std.mem.eql(u8, args[i], "-f")) {
-        flag_as_files = true;
-        i += 1;
-        n -= 1;
-    }
-    if (std.mem.eql(u8, args[i], "-x")) {
-        flag_convert_to_hex = true;
+    while (args[i][0] == '-') {
+        if (std.mem.eql(u8, args[i], "-i")) {
+            flag_ignore_case = true;
+        }
+        if (std.mem.eql(u8, args[i], "-f")) {
+            flag_as_files = true;
+        }
+        if (std.mem.eql(u8, args[i], "-x")) {
+            flag_convert_to_hex = true;
+        }
         i += 1;
         n -= 1;
     }
@@ -72,6 +70,7 @@ pub fn main() !void {
             fatal("could not read file '{s}': {}", .{ args[i], err });
         };
         if (!flag_convert_to_hex) {
+            // TODO: trim spaces and newlines, use mem.replace
             first = data;
             if (first[first.len - 1] == '\n') first = first[0 .. first.len - 1];
         } else {
@@ -82,7 +81,18 @@ pub fn main() !void {
         first = args[i];
     }
     if (first.len % 2 != 0) {
-        fatal("'{s}' has invalid length", .{first});
+        if (flag_as_files) {
+            fatal("content of file '{s}' has invalid length", .{args[i]});
+        } else {
+            fatal("{s} has invalid length", .{first});
+        }
+    }
+    if (!isHex(first)) {
+        if (flag_as_files) {
+            fatal("content of file '{s}' is not a hex string", .{args[i]});
+        } else {
+            fatal("{s} is not a hex string", .{first});
+        }
     }
     i += 1;
 
@@ -102,7 +112,18 @@ pub fn main() !void {
         second = args[i];
     }
     if (second.len % 2 != 0) {
-        fatal("'{s}' has invalid length", .{second});
+        if (flag_as_files) {
+            fatal("content of file '{s}' has invalid length", .{args[i]});
+        } else {
+            fatal("{s} has invalid length", .{second});
+        }
+    }
+    if (!isHex(second)) {
+        if (flag_as_files) {
+            fatal("content of file '{s}' is not a hex string", .{args[i]});
+        } else {
+            fatal("{s} is not a hex string", .{second});
+        }
     }
     i += 1;
 
@@ -115,6 +136,13 @@ pub fn main() !void {
         try bw.flush();
         std.process.exit(1);
     }
+}
+
+fn isHex(in: []const u8) bool {
+    for (in) |c| {
+        if (!isHexDigit(c)) return false;
+    }
+    return true;
 }
 
 fn readFile(all: std.mem.Allocator, path: []const u8) ![]const u8 {
@@ -135,6 +163,10 @@ const RESET = "\x1b[0m";
 
 fn isUpper(v: u8) bool {
     return v >= 'A' and v <= 'F';
+}
+
+fn isHexDigit(v: u8) bool {
+    return (v >= '0' and v <= '9') or (v >= 'a' and v <= 'f') or (v >= 'A' and v <= 'F');
 }
 
 test "isUpper" {
