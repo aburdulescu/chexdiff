@@ -21,7 +21,9 @@ pub fn main() !void {
         @compileError("requested OS is not supported!");
     }
 
-    const args = try std.process.argsAlloc(std.heap.c_allocator);
+    const allocator = std.heap.c_allocator;
+
+    const args = try std.process.argsAlloc(allocator);
 
     if (args.len == 1) {
         std.debug.print("{s}\n", .{usage});
@@ -66,15 +68,13 @@ pub fn main() !void {
 
     var first: []const u8 = undefined;
     if (flag_as_files) {
-        const data = readFile(std.heap.c_allocator, args[i]) catch |err| {
+        const data = readFile(allocator, args[i]) catch |err| {
             fatal("could not read file '{s}': {}", .{ args[i], err });
         };
         if (!flag_convert_to_hex) {
-            // TODO: trim spaces and newlines, use mem.replace
-            first = data;
             if (first[first.len - 1] == '\n') first = first[0 .. first.len - 1];
         } else {
-            var buf = try std.heap.c_allocator.alloc(u8, data.len * 2);
+            var buf = try allocator.alloc(u8, data.len * 2);
             first = try std.fmt.bufPrint(buf, "{}", .{std.fmt.fmtSliceHexLower(data)});
         }
     } else {
@@ -98,14 +98,14 @@ pub fn main() !void {
 
     var second: []const u8 = undefined;
     if (flag_as_files) {
-        const data = readFile(std.heap.c_allocator, args[i]) catch |err| {
+        const data = readFile(allocator, args[i]) catch |err| {
             fatal("could not read file '{s}': {}", .{ args[i], err });
         };
         if (!flag_convert_to_hex) {
             second = data;
             if (second[second.len - 1] == '\n') second = second[0 .. second.len - 1];
         } else {
-            var buf = try std.heap.c_allocator.alloc(u8, data.len * 2);
+            var buf = try allocator.alloc(u8, data.len * 2);
             second = try std.fmt.bufPrint(buf, "{}", .{std.fmt.fmtSliceHexLower(data)});
         }
     } else {
