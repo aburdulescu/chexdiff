@@ -72,7 +72,10 @@ pub fn main() !void {
             fatal("could not read file '{s}': {}", .{ args[i], err });
         };
         if (!flag_convert_to_hex) {
-            if (first[first.len - 1] == '\n') first = first[0 .. first.len - 1];
+            first = data;
+            if (first[first.len - 1] == '\n') {
+                first = first[0 .. first.len - 1];
+            }
         } else {
             var buf = try allocator.alloc(u8, data.len * 2);
             first = try std.fmt.bufPrint(buf, "{}", .{std.fmt.fmtSliceHexLower(data)});
@@ -103,7 +106,9 @@ pub fn main() !void {
         };
         if (!flag_convert_to_hex) {
             second = data;
-            if (second[second.len - 1] == '\n') second = second[0 .. second.len - 1];
+            if (second[second.len - 1] == '\n') {
+                second = second[0 .. second.len - 1];
+            }
         } else {
             var buf = try allocator.alloc(u8, data.len * 2);
             second = try std.fmt.bufPrint(buf, "{}", .{std.fmt.fmtSliceHexLower(data)});
