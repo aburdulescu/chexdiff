@@ -21,13 +21,15 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
 
-    const exe_tests = b.addTest(.{
+    const unit_tests = b.addTest(.{
         .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
-    exe_tests.linkLibC();
+    unit_tests.linkLibC();
+
+    const run_init_tests = b.addRunArtifact(unit_tests);
 
     const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&exe_tests.step);
+    test_step.dependOn(&run_init_tests.step);
 }
