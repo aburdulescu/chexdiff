@@ -4,7 +4,6 @@
 
 echo -n "$1" > src/version.txt
 
-zig build -Dtarget=native-native-musl -Drelease-safe=true -Dstrip=true
-strip -s zig-out/bin/chexdiff
+zig build -Dtarget=native-native-musl -Doptimize=ReleaseFast
 cp zig-out/bin/chexdiff .
 gzip -f --best chexdiff
